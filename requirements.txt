@@ -11,3 +11,4 @@ Pillow>=9.0.0     # Image handling dependency for reportlab
 folium>=0.12.1    # Alternative/complementary mapping
 plotly>=5.5.0     # Alternative/complementary mapping
 lxml>=4.9.0       # Often needed by pandas/other libraries for file parsing
+mss

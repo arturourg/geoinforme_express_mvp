@@ -1,7 +1,9 @@
 # backend/gee_processor.py
 import ee
-from utils import index_calculator
+ee.Initialize(project='geoinforme')  # Reemplaza con tu ID real ()from utils import index_calculator
+print(ee.data.getAssetRoots())  # Debe mostrar tus proyectos y assets accesibles.
 from utils.map_generator import generate_map_image, ndvi_vis, nbr_vis, ndwi_vis, rgb_vis
+from utils import index_calculator
 import time
 import os
 
@@ -11,7 +13,7 @@ DATA_DIR = 'data'
 # Initialize Earth Engine (redundant if already done in index_calculator, but safe)
 try:
     if not ee.data._credentials:
-        ee.Initialize()
+        ee.Initialize(project='geoinforme')
 except Exception as e:
     print(f"WARNING: Could not initialize EE in gee_processor: {e}")
     # The app might fail if EE wasn't initialized elsewhere
@@ -76,17 +78,54 @@ def process_aoi(aoi, start_date, end_date):
 
     # 2. Calculate Indices
     print("Calculating indices...")
-    ndvi = index_calculator.calculate_ndvi(base_image)
-    ndwi = index_calculator.calculate_ndwi(base_image)
-    nbr = index_calculator.calculate_nbr(base_image)
+    ndvi = None  # Inicializar a None
+    ndwi = None
+    nbr = None
+    calculation_step_error = None # Variable para guardar error específico
 
     # Check if index calculation failed
-    if ndvi is None or ndwi is None or nbr is None:
-        print("Processing failed: Error during index calculation.")
-        return {'error': "Failed to calculate one or more indices. Image might lack required bands."}
+    try:
+        print("DEBUG: [process_aoi] Attempting NDVI calculation...")
+        ndvi = index_calculator.calculate_ndvi(base_image)
+        print(f"DEBUG: [process_aoi] NDVI result type: {type(ndvi)}")
+        if ndvi is None:
+            raise ValueError("NDVI calculation returned None") # Forzar error si falla
 
-    # 3. Generate Map Images
-    print("Generating map images...")
+        print("DEBUG: [process_aoi] Attempting NDWI calculation...")
+        ndwi = index_calculator.calculate_ndwi(base_image)
+        print(f"DEBUG: [process_aoi] NDWI result type: {type(ndwi)}")
+        if ndwi is None:
+            raise ValueError("NDWI calculation returned None") # Forzar error si falla
+
+        print("DEBUG: [process_aoi] Attempting NBR calculation...")
+        nbr = index_calculator.calculate_nbr(base_image)
+        print(f"DEBUG: [process_aoi] NBR result type: {type(nbr)}")
+        if nbr is None:
+            raise ValueError("NBR calculation returned None") # Forzar error si falla
+
+        print("DEBUG: [process_aoi] All indices calculated successfully.")
+
+    # Captura errores específicos del cálculo aquí mismo
+    except ee.EEException as e:
+        print(f"ERROR: [process_aoi] GEE Error during index calculation step: {e}")
+        calculation_step_error = f"GEE Error during index calculation: {e}"
+    except ValueError as e:
+        print(f"ERROR: [process_aoi] ValueError during index calculation step: {e}")
+        calculation_step_error = f"Calculation returned None for {e}"
+    except Exception as e:
+        print(f"ERROR: [process_aoi] Unexpected Error during index calculation step: {e}")
+        import traceback
+        traceback.print_exc() # Imprime el traceback completo aquí
+        calculation_step_error = f"Unexpected error during index calculation: {e}"
+
+    # Si hubo un error en el bloque try-except anterior, retorna el error
+    if calculation_step_error:
+        print(f"DEBUG: [process_aoi] Returning error due to calculation failure: {calculation_step_error}")
+        return {'error': calculation_step_error}
+
+
+    # 3. Generate Map Images (Solo si no hubo errores antes)
+    print("DEBUG: [process_aoi] Proceeding to map generation...")
     timestamp = time.strftime("%Y%m%d-%H%M%S") # Unique identifier for this run
     results = {'metadata': {
         'aoi_bounds': aoi.bounds().getInfo()['coordinates'],

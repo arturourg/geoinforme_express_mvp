@@ -4,6 +4,7 @@ import ee
 # Initialize Earth Engine - Assumes authentication is done via CLI
 try:
     ee.Initialize()
+    ee.Initialize(project='geoinforme')  # Reemplaza con tu ID real ()from utils import index_calculator
     print("Google Earth Engine Initialized Successfully.")
 except ee.EEException as e:
     print(f"ERROR: Failed to initialize Earth Engine: {e}")
